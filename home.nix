@@ -204,11 +204,47 @@ in {
 	  # #ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 	  # ZSH_AUTOSUGGEST_STRATEGY=completion
 
-	  # FZF
+	  # Keychain
+	  function git_pass {
+	    eval `keychain --eval --agents ssh id_github`
+	  }
+
+	  ### FZF ### START
+
 	  if [ -n \"\${commands[fzf-share]}\" ]; then
 	  	source '$(fzf-share)/key-bindings.zsh'
 	  	source '$(fzf-share)/completion.zsh'
 	  fi
+
+	  # Use fd (https://github.com/sharkdp/fd) instead of the default find
+	  # command for listing path candidates.
+	  # - The first argument to the function ($1) is the base path to start traversal
+	  # - See the source code (completion.{bash,zsh}) for the details.
+	  _fzf_compgen_path() {
+	    fd --hidden --follow --exclude \".git\" . \"$1\"
+	  }
+	  
+	  # Use fd to generate the list for directory completion
+	  _fzf_compgen_dir() {
+	    fd --type d --hidden --follow --exclude \".git\" . \"$1\"
+	  }
+	  
+	  # (EXPERIMENTAL) Advanced customization of fzf options via _fzf_comprun function
+	  # - The first argument to the function is the name of the command.
+	  # - You should make sure to pass the rest of the arguments to fzf.
+	  _fzf_comprun() {
+	    local command=$1
+	    shift
+	    
+	    case \"$command\" in
+	    	  cd)           fzf \"$@\" --preview 'tree -C {} | head -200' ;;
+	    	  export|unset) fzf \"$@\" --preview \"eval 'echo \$'{}\" ;;
+	    	  ssh)          fzf \"$@\" --preview 'dig {}' ;;
+	    	  *)            fzf \"$@\" ;;
+	    esac
+	  }
+
+	  ### FZF ### END
 
 	  # Edit line in vim with ctrl-e:
 	  autoload edit-command-line; zle -N edit-command-line
@@ -220,6 +256,7 @@ in {
 		ll = "ls -l";
 		la = "ls -la";
 		update = "home-manager switch";
+		gpass = "git_pass";
 	  };
 
 	  history = {
@@ -231,6 +268,7 @@ in {
 	fzf = {
 	  enable = true;
 	  enableZshIntegration = true;
+	  # export FZF_DEFAULT_OPTS="--height 75% --reverse -m --border"
 	  defaultOptions = [ "--height 40%" "--border" "--info=inline"];
 	  historyWidgetOptions = [ "--sort" "--exact" ];
       fileWidgetOptions = [ "--preview 'head {file}'" ];
