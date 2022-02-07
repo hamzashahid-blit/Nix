@@ -140,8 +140,8 @@ in {
   programs = {
     git = {
       enable = true;
-      userName = "hamzashahid.blit";
-      userEmail = "hamzashahid@tutanota.com";
+      userName = "hamzashahid-blit";
+      userEmail = "hamzashahid.blit.git@protonmail.com";
     };
 
     # ssh = {
