@@ -6,11 +6,6 @@
 # 	comma = import ./comma-nix;
 # in 
 {
-  imports = [
-    ./modules/zsh.nix
-	./modules/btrbk.nix
-  ];
-
   # Let Home Manager install and manage itself.
   programs.home-manager.enable = true;
 
@@ -26,9 +21,6 @@
   services.lorri.enable = true;
   services.emacs.defaultEditor = true;
 
-  # KDE Connect (Pair Computer with Phone)
-  services.kdeconnect.enable = true;
-
   # services.xserver.xautolock.enable = true;
 
   # So we don't have to type: fonts.fonts = with pkgs; [...]
@@ -37,11 +29,6 @@
   # Scroll to bottom to find this fix
   fonts.fontconfig.enable = true;
 
-  # Enable even more extra development man-pages
-  lib.documentation.dev.enable = true;
-
-  # Some applications are disabled because I created seperate modules for them
-  # Others are just ones that I don't want anymore.
   home.packages = with pkgs; [
 	# Fonts
 	mononoki   # Nice monospace font
@@ -90,8 +77,7 @@
 	sxiv         # Suckless X Image Viewer
 	lf			 # Terminal filemanager heavily inspired from ranger in Go
 	nyxt         # Most Configurable Browser ever. Made in Common Lisp
-	#btrbk	     # Snapshot BTRFS; More flexible than Timeshift or Snapper
-	kate		 # KDE Text Editor (very nice)
+	btrbk	     # Snapshot BTRFS; More flexible than Timeshift or Snapper
 
     # Other small programs
 	neofetch		# Show system Info
@@ -123,10 +109,8 @@
 	#opam     # OCaml Package Manager, Makes life easier
 
 	# Programming Extras
-	freefont_ttf    # Font dependeny for some applications
-	#graphviz       # Make graphs with programming and a terminal
-	man-pages       # Enable extra dev man-pages
-	man-pages-posix # `` Posix version
+	freefont_ttf # Font dependeny for some applications
+	#graphviz    # Make graphs with programming and a terminal
 
 	# Extra Programs
 	## What is going on with pipe-viewer? I have a result file in this directory... just use that for now
@@ -155,7 +139,7 @@
 	xorg.xinit
 
 	# Small Aestheticizing Programs
-	#zsh-powerlevel10k
+	zsh-powerlevel10k
 
 	# Nix Stuff
 	nix-index
@@ -183,6 +167,123 @@
 
     bat.enable = true;
 
+	zsh = {
+	  enable = true;
+
+	  plugins = [
+		{
+		  name = "zsh-powerlevel10k";
+		  src = pkgs.zsh-powerlevel10k;
+		  file = "share/zsh-powerlevel10k/powerlevel10k.zsh-theme";
+		}
+		{
+		  name = "powerlevel10k-config";
+		  src = pkgs.lib.cleanSource ./p10k-config;
+		  file = "p10k.zsh";
+		}
+	  ];
+
+	  enableAutosuggestions = true;
+	  enableCompletion = true;
+	  enableSyntaxHighlighting = true;
+	  enableVteIntegration = true;
+
+	  defaultKeymap = "viins";
+	  initExtra = "
+	  # Enable colors and change prompt:
+	  # autoload -U colors && colors
+	  # PS1=\"%B%{$fg[red]%}[%{$fg[yellow]%}%n%{$fg[green]%}@%{$fg[blue]%}%M %{$fg[magenta]%}%~%{$fg[red]%}]%{$reset_color%}$%b\"
+  	
+	  # Basic auto/tab complete:
+	  # autoload -U compinit
+	  zstyle ':completion:*' menu select
+	  zmodload zsh/complist
+	  # compinit
+	  _comp_options+=(globdots)		# Include hidden files.
+  	
+	  # vi mode
+	  bindkey -v
+	  export KEYTIMEOUT=1
+  	
+	  # Use vim keys in tab complete menu:
+	  bindkey -M menuselect 'h' vi-backward-char
+	  bindkey -M menuselect 'k' vi-up-line-or-history
+	  bindkey -M menuselect 'l' vi-forward-char
+	  bindkey -M menuselect 'j' vi-down-line-or-history
+	  bindkey -v '^?' backward-delete-char
+
+	  bindkey '^ ' autosuggest-accept
+	  # If can't find from history, find from auto-tab
+	  ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+	  # ZSH_AUTOSUGGEST_STRATEGY=completion
+
+	  # Keychain
+	  function git_pass {
+	    eval `keychain --eval --agents ssh id_github`
+	  }
+
+	  ### FZF ### START
+
+	  #if [ -n \"\${commands[fzf-share]}\" ]; then
+	  #	source '$(fzf-share)/key-bindings.zsh'
+	  #	source '$(fzf-share)/completion.zsh'
+	  #fi
+
+	  # Use fd (https://github.com/sharkdp/fd) instead of the default find
+	  # command for listing path candidates.
+	  # - The first argument to the function ($1) is the base path to start traversal
+	  # - See the source code (completion.{bash,zsh}) for the details.
+	  _fzf_compgen_path() {
+	    fd --hidden --follow --exclude \".git\" . \"$1\"
+	  }
+	  
+	  # Use fd to generate the list for directory completion
+	  _fzf_compgen_dir() {
+	    fd --type d --hidden --follow --exclude \".git\" . \"$1\"
+	  }
+	  
+	  # (EXPERIMENTAL) Advanced customization of fzf options via _fzf_comprun function
+	  # - The first argument to the function is the name of the command.
+	  # - You should make sure to pass the rest of the arguments to fzf.
+	  _fzf_comprun() {
+	    local command=$1
+	    shift
+	    
+	    case \"$command\" in
+	    	  cd)           fzf \"$@\" --preview 'tree -C {} | head -200' ;;
+	    	  export|unset) fzf \"$@\" --preview \"eval 'echo \$'{}\" ;;
+	    	  ssh)          fzf \"$@\" --preview 'dig {}' ;;
+	    	  *)            fzf \"$@\" ;;
+	    esac
+	  }
+
+	  ### FZF ### END
+
+	  # Edit line in vim with ctrl-e:
+	  autoload edit-command-line; zle -N edit-command-line
+	  bindkey '^e' edit-command-line
+
+	  ### Custom Functions
+	  e_client () {
+		emacsclient -c -a \"\" $1 &
+	  }
+	  ";
+
+	  shellAliases = {
+		cl = "clear";
+		ll = "ls -l";
+		la = "ls -la";
+		update = "home-manager switch";
+		e = "e_client";
+		gpass = "git_pass";
+	  };
+
+	  history = {
+		size = 10000;
+		path = "${config.xdg.dataHome}/zsh/history";
+	  };
+	};
+
 	fzf = {
 	  enable = true;
 	  enableZshIntegration = true;
@@ -191,7 +292,6 @@
 	  historyWidgetOptions = [ "--sort" "--exact" ];
       fileWidgetOptions = [ "--preview 'head {file}'" ];
 	};
-
   };
 
   #home.file.".emacs.d".source = ./.emacs.d;
