@@ -22,6 +22,7 @@
     enableCompletion = true;
     enableSyntaxHighlighting = true;
     enableVteIntegration = true;
+	# completionInit = "autoload -U compinit && compinit"
 
     defaultKeymap = "viins";
     initExtra = "
@@ -39,6 +40,8 @@
     # vi mode
     bindkey -v
     export KEYTIMEOUT=1
+	# Make Emacs the default editor for programs like git
+	export VISUAL=e
 
     # Use vim keys in tab complete menu:
     bindkey -M menuselect 'h' vi-backward-char
@@ -48,14 +51,19 @@
     bindkey -v '^?' backward-delete-char
 
     bindkey '^ ' autosuggest-accept
+
     # If can't find from history, find from auto-tab
     ZSH_AUTOSUGGEST_STRATEGY=(history completion)
     # ZSH_AUTOSUGGEST_STRATEGY=completion
 
     # Keychain
-    function git_pass {
+    function github_pass {
       eval `keychain --eval --agents ssh id_github`
     }
+
+	function gitlab_pass {
+	  eval `keychain --eval --agents ssh id_gitlab`
+	}
 
     ### FZF ### START
 
@@ -102,15 +110,85 @@
     e_client () {
     	emacsclient -c -a \"\" $1 &
     }
+
+	### VTERM ### START
+	# Directory tracking etc. NOTE: I had to put extra backslashes for it work
+	vterm_printf(){
+		if [ -n \"$TMUX\" ] && ([ \"\${TERM%%-*}\" = \"tmux\" ] || [ \"\${TERM%%-*}\" = \"screen\" ] ); then
+			# Tell tmux to pass the escape sequences through
+			printf \"\\ePtmux;\\e\\e]%s\\007\\e\\\\\" \"$1\"
+		elif [ \"\${TERM%%-*}\" = \"screen\" ]; then
+			# GNU screen (screen, screen-256color, screen-256color-bce)
+			printf \"\\eP\\e]%s\\007\\e\\\\\" \"$1\"
+		else
+			printf \"\\e]%s\\e\\\\\" \"$1\"
+		fi
+	}
+
+	# Clear Scrollback
+	if [[ \"$INSIDE_EMACS\" = 'vterm' ]]; then
+		alias clear='vterm_printf \"51;Evterm-clear-scrollback\";tput clear'
+	fi
+
+	# Prompt Tracking & Dir Tracking
+	vterm_prompt_end() {
+		vterm_printf \"51;A$(whoami)@$(hostname):$(pwd)\";
+	}
+	setopt PROMPT_SUBST
+	PROMPT=$PROMPT'%{$(vterm_prompt_end)%}'
+	
+	# Evaluate commands like: (message 'Hello World!')
+	vterm_cmd() {
+		local vterm_elisp
+		vterm_elisp=\"\"
+		while [ $# -gt 0 ]; do
+			vterm_elisp=\"$vterm_elisp\"\"$(printf '\"%s\" ' \"$(printf \"%s\" \"$1\" | sed -e 's|\\\\|\\\\\\\\|g' -e 's|\"|\\\"|g')\")\"
+			shift
+		done
+		vterm_printf \"51;E$vterm_elisp\"
+	}
+
+	find_file() {
+		vterm_cmd find-file \"$(realpath \"\${@:-.}\")\"
+	}
+
+	say() {
+		vterm_cmd message \"%s\" \"$*\"
+	}
+
+	vterm_set_directory() {
+		vterm_cmd update-pwd \"$PWD/\"
+	}
+
+	autoload -U add-zsh-hook
+	add-zsh-hook -Uz chpwd (){ vterm_set_directory }
+
+	# Always find the VTerm Library
+	if [[ \"$INSIDE_EMACS\" = 'vterm' ]] \\
+		&& [[ -n \${EMACS_VTERM_PATH} ]] \\
+		&& [[ -f \${EMACS_VTERM_PATH}/etc/emacs-vterm-bash.sh ]]; then
+		source \${EMACS_VTERM_PATH}/etc/emacs-vterm-bash.sh
+	fi
+	### VTERM ### END
+
+	# For Lorri w/ Nix (Amazingggggg)
+	eval \"$(direnv hook zsh)\"
     ";
 
     shellAliases = {
     	cl = "clear";
+        ls   = "exa";
     	ll = "ls -l";
     	la = "ls -la";
     	update = "home-manager switch";
+    	sys-update = "sudo nixos-rebuild switch";
     	e = "e_client";
-    	gpass = "git_pass";
+		ff = "find_file";
+    	gpass = "github_pass";
+    	glpass = "gitlab_pass";
+		y = "mpv --ytdl-raw-options=format-sort='res:1080'";
+		y7 = "mpv --ytdl-raw-options=format-sort='res:720'";
+		y4 = "mpv --ytdl-raw-options=format-sort='res:480'";
     };
 
     history = {

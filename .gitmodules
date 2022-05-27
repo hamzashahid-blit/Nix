@@ -1,3 +1,6 @@
 [submodule "ql2nix"]
 	path = ql2nix
 	url = https://github.com/SquircleSpace/ql2nix
+[submodule "comma"]
+	path = comma
+	url = https://github.com/nix-community/comma
